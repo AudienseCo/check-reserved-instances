@@ -59,7 +59,7 @@ def calculate_ec2_ris(session, results):
 
     This function is unique as it performs both checks for both VPC-launched
     instances, and EC2-Classic instances. Classic and VPC
-    instances/reservations are treated separately in the report.
+    instances/reservations are treated together in the report.
 
     Args:
         session (:boto3:session.Session): The authenticated boto3 session.
@@ -106,26 +106,14 @@ def calculate_ec2_ris(session, results):
                     # If skip tag is not found, increment running instances
                     # count and add instance name/ID
                     if not found_skip_tag:
-                        # not in vpc
-                        if not instance.get('VpcId'):
-                            results['ec2_classic_running_instances'][(
-                                instance_type,
+                        results['ec2_running_instances'][
+                            (instance_type,
                                 az)] = results[
-                                'ec2_classic_running_instances'].get(
-                                (instance_type, az), 0) + 1
-                            instance_ids[(instance_type, az)].append(
-                                instance['InstanceId'] if not instance_name
-                                else instance_name)
-                        else:
-                            # inside vpc
-                            results['ec2_vpc_running_instances'][
-                                (instance_type,
-                                 az)] = results[
-                                'ec2_vpc_running_instances'].get(
-                                (instance_type, az), 0) + 1
-                            instance_ids[(instance_type, az)].append(
-                                instance['InstanceId'] if not instance_name
-                                else instance_name)
+                            'ec2_running_instances'].get(
+                            (instance_type, az), 0) + 1
+                        instance_ids[(instance_type, az)].append(
+                            instance['InstanceId'] if not instance_name
+                            else instance_name)
 
     # Loop through active EC2 RIs and record their AZ and type.
     for reserved_instance in ec2_conn.describe_reserved_instances(
@@ -138,18 +126,11 @@ def calculate_ec2_ris(session, results):
             az = 'All'
 
         instance_type = reserved_instance['InstanceType']
-        # check if VPC/Classic reserved instance
-        if account_is_vpc_only or 'VPC' in reserved_instance.get(
-                'ProductDescription'):
-            results['ec2_vpc_reserved_instances'][(
-                instance_type, az)] = results[
-                'ec2_vpc_reserved_instances'].get(
-                (instance_type, az), 0) + reserved_instance['InstanceCount']
-        else:
-            results['ec2_classic_reserved_instances'][(
-                instance_type, az)] = results[
-                'ec2_classic_reserved_instances'].get(
-                (instance_type, az), 0) + reserved_instance['InstanceCount']
+
+        results['ec2_reserved_instances'][(
+            instance_type, az)] = results[
+            'ec2_reserved_instances'].get(
+            (instance_type, az), 0) + reserved_instance['InstanceCount']
 
         reserve_expiry[(instance_type, az)].append(calc_expiry_time(
             expiry=reserved_instance['End']))
